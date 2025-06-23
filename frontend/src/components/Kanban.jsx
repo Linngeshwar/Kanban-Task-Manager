@@ -1,4 +1,6 @@
 import useTaskStore from "../stores/TaskStore";
+import { useState } from "react";
+import { useEffect } from "react";
 
 const columns = [
   {
@@ -28,7 +30,39 @@ const columns = [
 ];
 
 export default function Kanban() {
-  const { tasks } = useTaskStore();
+  const { tasks, addTask } = useTaskStore();
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [newTask, setNewTask] = useState({
+    title: "",
+    description: "",
+    status: "todo",
+  });
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (newTask.title.trim()) {
+      addTask(newTask.title, newTask.description, newTask.status);
+      setNewTask({ title: "", description: "", status: "todo" });
+      setIsModalOpen(false);
+    }
+  };
+
+  const handleModalClose = () => {
+    setIsModalOpen(false);
+    setNewTask({ title: "", description: "", status: "todo" });
+  };
+
+  // Handle escape key press to close modal
+  useEffect(() => {
+    const handleEscape = (event) => {
+      if (event.key === "Escape" && isModalOpen) {
+        handleModalClose();
+      }
+    };
+
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [isModalOpen]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-slate-900 to-black p-6">
@@ -153,7 +187,10 @@ export default function Kanban() {
               </div>
 
               {/* Add Task Button */}
-              <button className="w-full mt-4 p-3 border-2 border-dashed border-slate-600 rounded-xl text-gray-400 hover:text-white hover:border-slate-500 transition-all duration-200 flex items-center justify-center gap-2 group">
+              <button
+                onClick={() => setIsModalOpen(true)}
+                className="w-full mt-4 p-3 border-2 border-dashed border-slate-600 rounded-xl text-gray-400 hover:text-white hover:border-slate-500 transition-all duration-200 flex items-center justify-center gap-2 group"
+              >
                 <svg
                   className="w-5 h-5 group-hover:scale-110 transition-transform"
                   fill="none"
@@ -173,6 +210,121 @@ export default function Kanban() {
           </div>
         ))}
       </div>
+
+      {/* Add Task Modal */}
+      {isModalOpen && (
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-40"
+          onClick={handleModalClose}
+        >
+          <div
+            className="bg-slate-800 rounded-2xl border border-slate-700/50 shadow-2xl w-full max-w-md z-50"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="p-6 border-b border-slate-700/50">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold text-white">Add New Task</h2>
+                <button
+                  onClick={handleModalClose}
+                  className="p-2 rounded-lg hover:bg-slate-700/50 transition-colors"
+                >
+                  <svg
+                    className="w-6 h-6 text-gray-400 hover:text-white"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <form onSubmit={handleSubmit} className="p-6 space-y-6">
+              {/* Task Title */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Task Title *
+                </label>
+                <input
+                  type="text"
+                  value={newTask.title}
+                  onChange={(e) =>
+                    setNewTask({ ...newTask, title: e.target.value })
+                  }
+                  placeholder="Enter task title..."
+                  className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  required
+                />
+              </div>
+
+              {/* Task Description */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Description
+                </label>
+                <textarea
+                  value={newTask.description}
+                  onChange={(e) =>
+                    setNewTask({ ...newTask, description: e.target.value })
+                  }
+                  placeholder="Enter task description..."
+                  rows={3}
+                  className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none"
+                />
+              </div>
+
+              {/* Task Status */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Status
+                </label>
+                <select
+                  value={newTask.status}
+                  onChange={(e) =>
+                    setNewTask({ ...newTask, status: e.target.value })
+                  }
+                  className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                >
+                  {columns.map((col) => (
+                    <option
+                      key={col.key}
+                      value={col.key}
+                      className="bg-slate-700"
+                    >
+                      {col.icon} {col.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Modal Actions */}
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={handleModalClose}
+                  className="flex-1 px-4 py-3 bg-slate-700/50 hover:bg-slate-600/50 text-gray-300 hover:text-white rounded-xl transition-all duration-200 font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded-xl transition-all duration-200 font-medium shadow-lg hover:shadow-xl"
+                >
+                  Add Task
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
