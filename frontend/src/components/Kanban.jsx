@@ -1,6 +1,6 @@
 import useTaskStore from "../stores/TaskStore";
-import { useState } from "react";
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
+import TaskModal from "./TaskModal";
 
 const columns = [
   {
@@ -30,14 +30,23 @@ const columns = [
 ];
 
 export default function Kanban() {
-  const { tasks, addTask } = useTaskStore();
+  const { tasks, addTask, moveTask, editTask, removeTask } = useTaskStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [hoveredColumn, setHoveredColumn] = useState(null);
   const [newTask, setNewTask] = useState({
     title: "",
     description: "",
-    status: "todo",
+    status: "",
+  });
+  const [editTaskData, setEditTaskData] = useState({
+    id: null,
+    title: "",
+    description: "",
+    status: "",
   });
 
+  // Add Task
   const handleSubmit = (e) => {
     e.preventDefault();
     if (newTask.title.trim()) {
@@ -46,23 +55,47 @@ export default function Kanban() {
       setIsModalOpen(false);
     }
   };
-
   const handleModalClose = () => {
     setIsModalOpen(false);
     setNewTask({ title: "", description: "", status: "todo" });
   };
+  const handleOpenModal = (status) => {
+    setIsModalOpen(true);
+    setNewTask({ ...newTask, status });
+  };
+  // Edit Task
+  const openEditModal = (task) => {
+    setEditTaskData(task);
+    setIsEditModalOpen(true);
+  };
+  const handleEditModalClose = () => {
+    setIsEditModalOpen(false);
+    setEditTaskData({ id: null, title: "", description: "", status: "todo" });
+  };
+  const handleEditSubmit = (e) => {
+    e.preventDefault();
+    if (editTaskData.title.trim()) {
+      editTask(editTaskData.id, {
+        title: editTaskData.title,
+        description: editTaskData.description,
+        status: editTaskData.status,
+      });
+      setIsEditModalOpen(false);
+      setEditTaskData({ id: null, title: "", description: "", status: "todo" });
+    }
+  };
 
-  // Handle escape key press to close modal
+  // Handle escape key press to close modals
   useEffect(() => {
     const handleEscape = (event) => {
-      if (event.key === "Escape" && isModalOpen) {
-        handleModalClose();
+      if (event.key === "Escape") {
+        if (isModalOpen) handleModalClose();
+        if (isEditModalOpen) handleEditModalClose();
       }
     };
-
     document.addEventListener("keydown", handleEscape);
     return () => document.removeEventListener("keydown", handleEscape);
-  }, [isModalOpen]);
+  }, [isModalOpen, isEditModalOpen]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-slate-900 to-black p-6">
@@ -81,7 +114,29 @@ export default function Kanban() {
         {columns.map((col) => (
           <div
             key={col.key}
-            className="bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-slate-700/50 shadow-2xl transition-all duration-300 hover:shadow-xl hover:border-slate-600/50"
+            onDragOver={(e) => {
+              e.preventDefault();
+              setHoveredColumn(col.key);
+            }}
+            onDragLeave={(e) => {
+              // Only reset if we're leaving the column container entirely
+              if (!e.currentTarget.contains(e.relatedTarget)) {
+                setHoveredColumn(null);
+              }
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              const taskID = e.dataTransfer.getData("text/plain");
+              if (taskID) {
+                moveTask(taskID, col.key);
+              }
+              setHoveredColumn(null);
+            }}
+            className={`rounded-2xl transition-all duration-100 border-2 ${
+              hoveredColumn === col.key
+                ? "border-blue-500 shadow-lg scale-[1.02]"
+                : "border-slate-700/50"
+            }`}
           >
             {/* Column Header */}
             <div className="p-6 border-b border-slate-700/50">
@@ -101,14 +156,21 @@ export default function Kanban() {
             </div>
 
             {/* Tasks Container */}
-            <div className="p-4 min-h-[500px] max-h-[600px] overflow-y-auto custom-scrollbar">
+            <div
+              className={`p-4 min-h-[500px] max-h-[600px] overflow-y-auto custom-scrollbar`}
+            >
               <div className="space-y-3">
                 {tasks
                   .filter((t) => t.status === col.key)
                   .map((task) => (
                     <div
                       key={task.id}
-                      className="group bg-slate-800/80 backdrop-blur-sm rounded-xl border border-slate-700/30 p-4 cursor-grab hover:cursor-grabbing transition-all duration-200 hover:bg-slate-700/80 hover:border-slate-600/50 hover:shadow-lg hover:-translate-y-1"
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData("text/plain", task.id);
+                      }}
+                      onDragEnd={() => {}}
+                      className={`group bg-slate-800/80 backdrop-blur-sm rounded-xl border border-slate-700/30 p-4 cursor-grab hover:cursor-grabbing transition-all duration-200 hover:bg-slate-700/80 hover:border-slate-600/50 hover:shadow-lg hover:-translate-y-1`}
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
@@ -125,7 +187,11 @@ export default function Kanban() {
                           </div>
                         </div>
                         <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button className="p-1.5 rounded-lg hover:bg-slate-600/50 transition-colors">
+                          <button
+                            className="p-1.5 rounded-lg hover:bg-slate-600/50 transition-colors"
+                            onClick={() => openEditModal(task)}
+                            title="Edit Task"
+                          >
                             <svg
                               className="w-4 h-4 text-gray-400 hover:text-white"
                               fill="none"
@@ -140,7 +206,11 @@ export default function Kanban() {
                               />
                             </svg>
                           </button>
-                          <button className="p-1.5 rounded-lg hover:bg-red-500/20 transition-colors">
+                          <button
+                            className="p-1.5 rounded-lg hover:bg-red-500/20 transition-colors"
+                            onClick={() => removeTask(task.id)}
+                            title="Delete Task"
+                          >
                             <svg
                               className="w-4 h-4 text-gray-400 hover:text-red-400"
                               fill="none"
@@ -188,7 +258,7 @@ export default function Kanban() {
 
               {/* Add Task Button */}
               <button
-                onClick={() => setIsModalOpen(true)}
+                onClick={() => handleOpenModal(col.key)}
                 className="w-full mt-4 p-3 border-2 border-dashed border-slate-600 rounded-xl text-gray-400 hover:text-white hover:border-slate-500 transition-all duration-200 flex items-center justify-center gap-2 group"
               >
                 <svg
@@ -212,119 +282,25 @@ export default function Kanban() {
       </div>
 
       {/* Add Task Modal */}
-      {isModalOpen && (
-        <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-40"
-          onClick={handleModalClose}
-        >
-          <div
-            className="bg-slate-800 rounded-2xl border border-slate-700/50 shadow-2xl w-full max-w-md z-50"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div className="p-6 border-b border-slate-700/50">
-              <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-white">Add New Task</h2>
-                <button
-                  onClick={handleModalClose}
-                  className="p-2 rounded-lg hover:bg-slate-700/50 transition-colors"
-                >
-                  <svg
-                    className="w-6 h-6 text-gray-400 hover:text-white"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-            {/* Modal Body */}
-            <form onSubmit={handleSubmit} className="p-6 space-y-6">
-              {/* Task Title */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Task Title *
-                </label>
-                <input
-                  type="text"
-                  value={newTask.title}
-                  onChange={(e) =>
-                    setNewTask({ ...newTask, title: e.target.value })
-                  }
-                  placeholder="Enter task title..."
-                  className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  required
-                />
-              </div>
-
-              {/* Task Description */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Description
-                </label>
-                <textarea
-                  value={newTask.description}
-                  onChange={(e) =>
-                    setNewTask({ ...newTask, description: e.target.value })
-                  }
-                  placeholder="Enter task description..."
-                  rows={3}
-                  className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none"
-                />
-              </div>
-
-              {/* Task Status */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Status
-                </label>
-                <select
-                  value={newTask.status}
-                  onChange={(e) =>
-                    setNewTask({ ...newTask, status: e.target.value })
-                  }
-                  className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                >
-                  {columns.map((col) => (
-                    <option
-                      key={col.key}
-                      value={col.key}
-                      className="bg-slate-700"
-                    >
-                      {col.icon} {col.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Modal Actions */}
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={handleModalClose}
-                  className="flex-1 px-4 py-3 bg-slate-700/50 hover:bg-slate-600/50 text-gray-300 hover:text-white rounded-xl transition-all duration-200 font-medium"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded-xl transition-all duration-200 font-medium shadow-lg hover:shadow-xl"
-                >
-                  Add Task
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <TaskModal
+        isOpen={isModalOpen}
+        onClose={handleModalClose}
+        onSubmit={handleSubmit}
+        taskData={newTask}
+        setTaskData={setNewTask}
+        columns={columns}
+        mode="add"
+      />
+      {/* Edit Task Modal */}
+      <TaskModal
+        isOpen={isEditModalOpen}
+        onClose={handleEditModalClose}
+        onSubmit={handleEditSubmit}
+        taskData={editTaskData}
+        setTaskData={setEditTaskData}
+        columns={columns}
+        mode="edit"
+      />
     </div>
   );
 }
