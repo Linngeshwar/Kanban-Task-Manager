@@ -30,7 +30,7 @@ const columns = [
 ];
 
 export default function Kanban() {
-  const { tasks, addTask } = useTaskStore();
+  const { tasks, addTask, moveTask } = useTaskStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newTask, setNewTask] = useState({
     title: "",
@@ -81,6 +81,11 @@ export default function Kanban() {
         {columns.map((col) => (
           <div
             key={col.key}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              const taskID = e.dataTransfer.getData("text/plain");
+              moveTask(taskID, col.key);
+            }}
             className="bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-slate-700/50 shadow-2xl transition-all duration-300 hover:shadow-xl hover:border-slate-600/50"
           >
             {/* Column Header */}
@@ -108,6 +113,10 @@ export default function Kanban() {
                   .map((task) => (
                     <div
                       key={task.id}
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData("text/plain", task.id);
+                      }}
                       className="group bg-slate-800/80 backdrop-blur-sm rounded-xl border border-slate-700/30 p-4 cursor-grab hover:cursor-grabbing transition-all duration-200 hover:bg-slate-700/80 hover:border-slate-600/50 hover:shadow-lg hover:-translate-y-1"
                     >
                       <div className="flex items-start justify-between">
